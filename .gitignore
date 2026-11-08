@@ -6,7 +6,6 @@ dist/
 
 cofres_data.json
 cofres.txt
-plantilla_cofre.png
 *.log
 
 __pycache__/

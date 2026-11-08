@@ -37,6 +37,8 @@ python app.py
 
 La calibración se guarda en `plantilla_cofre.png` y no hay que repetirla.
 
+> El repositorio incluye una `plantilla_cofre.png` ya calibrada para **1920×1080**. Si juegas en esa resolución, cópiala junto a `ContadorCofres.exe` (o déjala junto a `app.py` si usas Python) y te puedes saltar la calibración. En otras resoluciones, calibra con F6.
+
 > Usa Fortnite en modo **"Pantalla completa en ventana"** para que la ventana del contador se vea encima del juego.
 
 ## Controles
