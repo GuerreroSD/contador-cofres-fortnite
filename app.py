@@ -1,15 +1,3 @@
-"""
-Punto de entrada de ContadorCofres.exe
-
-  ContadorCofres.exe                -> abre el contador. La primera vez además lo deja
-                                       configurado para abrirse solo con Fortnite.
-  ContadorCofres.exe --contador     -> (interno) solo el contador, lo usa el vigilante
-  ContadorCofres.exe --vigilar      -> (interno) vigilante en segundo plano
-  ContadorCofres.exe --instalar     -> fuerza la instalación en el inicio de Windows
-  ContadorCofres.exe --desinstalar  -> deja de iniciarse con Windows
-  ContadorCofres.exe --probar       -> diagnóstico
-"""
-
 import sys
 
 
@@ -21,7 +9,6 @@ def main() -> None:
         return
 
     if getattr(sys, "frozen", False) and "--contador" not in args:
-        # Doble clic: asegura que el vigilante quede instalado y corriendo
         import vigilar_fortnite
         try:
             if vigilar_fortnite.asegurar_vigilante():

@@ -1,29 +1,3 @@
-"""
-Contador automático de cofres para Fortnite (por reconocimiento de pantalla)
----------------------------------------------------------------------------
-El script solo MIRA la pantalla (como una captura). No lee la memoria del juego
-ni se mete en él.
-
-Cómo detecta un cofre:
-  1. Busca en pantalla el aviso del cofre ("Cofre - Buscar [E]") usando una
-     imagen de referencia que tú recortas una vez (calibración).
-  2. Si el aviso estaba visible, tú presionaste la tecla de interactuar (E)
-     y el aviso desaparece -> el cofre se abrió -> +1.
-
-Teclas:
-  F5  -> activar / pausar la detección automática
-  F6  -> calibrar (mira un cofre cerrado con el aviso visible y presiona F6)
-  F7  -> -1 cofre (corrección)
-  F8  -> +1 cofre (manual)
-  F9  -> reiniciar contador de la partida
-  F10 -> cerrar  (clic derecho sobre la ventana también cierra)
-
-Requisitos:
-  pip install mss opencv-python numpy pillow pynput
-
-Usa Fortnite en "Pantalla completa en ventana".
-"""
-
 import ctypes
 import json
 import queue
@@ -39,7 +13,6 @@ import numpy as np
 from PIL import Image, ImageTk
 from pynput import keyboard
 
-# Para que las coordenadas coincidan con píxeles reales si Windows tiene escalado (125 %, 150 %...)
 if sys.platform == "win32":
     try:
         ctypes.windll.shcore.SetProcessDpiAwareness(2)
@@ -49,21 +22,18 @@ if sys.platform == "win32":
         except Exception:
             pass
 
-# ======================= Configuración =======================
-TECLA_INTERACTUAR = "e"      # tu tecla para abrir cofres en Fortnite
-UMBRAL = 0.80                # parecido mínimo (0-1) para considerar que el aviso está en pantalla
-HISTERESIS = 0.12            # el aviso "desaparece" cuando baja de UMBRAL - HISTERESIS
-AREA_BUSQUEDA = 0.9          # fracción central de la pantalla donde se busca el aviso (1.0 = toda)
-ESCALA = 1.0                 # bájalo a 0.5 si el PC va lento (detecta un poco peor)
-FPS = 15                     # capturas por segundo
-TIEMPO_ARMADO = 3.0          # segundos tras presionar E (con el aviso visible) en que se espera que el aviso desaparezca
-ENFRIAMIENTO = 1.2           # segundos mínimos entre dos conteos automáticos
-REQUERIR_TECLA = True        # False = cuenta cada vez que el aviso desaparece, sin mirar la E
-                             #         (útil con mando/joystick, pero puede contar si te alejas del cofre)
-MIN_VISIBLE = 0.3            # (solo con REQUERIR_TECLA = False) segundos mínimos que el aviso debe estar visible
-MONITOR = 1                  # 1 = monitor principal
+TECLA_INTERACTUAR = "e"
+UMBRAL = 0.80
+HISTERESIS = 0.12
+AREA_BUSQUEDA = 0.9
+ESCALA = 1.0
+FPS = 15
+TIEMPO_ARMADO = 3.0
+ENFRIAMIENTO = 1.2
+REQUERIR_TECLA = True
+MIN_VISIBLE = 0.3
+MONITOR = 1
 
-# Si corre como .exe (PyInstaller), los datos van junto al .exe y no en la carpeta temporal
 if getattr(sys, "frozen", False):
     CARPETA = Path(sys.executable).resolve().parent
 else:
@@ -75,10 +45,8 @@ ARCHIVO_PLANTILLA = CARPETA / "plantilla_cofre.png"
 OPACIDAD = 0.85
 COLOR_FONDO = "#1b1b2f"
 COLOR_TEXTO = "#ffd54f"
-# =============================================================
 
 
-# ---------------------- Persistencia ----------------------
 def cargar_total() -> int:
     try:
         return int(json.loads(ARCHIVO_DATOS.read_text(encoding="utf-8")).get("total", 0))
@@ -87,7 +55,6 @@ def cargar_total() -> int:
 
 
 def _escribir(archivo: Path, texto: str) -> None:
-    # Otro programa (OBS, antivirus, indexador) puede tener el archivo bloqueado un instante
     for intento in range(5):
         try:
             archivo.write_text(texto, encoding="utf-8")
@@ -102,7 +69,6 @@ def guardar(partida: int, total: int) -> None:
 
 
 def nueva_captura():
-    """mss >= 10 renombró mss.mss a mss.MSS."""
     return getattr(mss, "MSS", mss.mss)()
 
 
@@ -117,7 +83,6 @@ def cargar_calibracion():
 
 
 def zona_busqueda(monitor: dict) -> dict:
-    """Rectángulo central del monitor donde se busca el aviso."""
     ancho = int(monitor["width"] * AREA_BUSQUEDA)
     alto = int(monitor["height"] * AREA_BUSQUEDA)
     return {
@@ -133,12 +98,10 @@ def reducir(img: np.ndarray) -> np.ndarray:
     return cv2.resize(img, None, fx=ESCALA, fy=ESCALA, interpolation=cv2.INTER_AREA)
 
 
-# ---------------------- Detección ----------------------
-UMBRAL_BLANCO = 200          # brillo mínimo (0-255) para considerar un píxel como "letra blanca"
+UMBRAL_BLANCO = 200
 
 
 def preprocesar(img_bgra: np.ndarray) -> np.ndarray:
-    """Deja solo las letras blancas del aviso (E / ABRIR) y borra el fondo semitransparente."""
     gris = cv2.cvtColor(img_bgra, cv2.COLOR_BGRA2GRAY)
     _, binaria = cv2.threshold(gris, UMBRAL_BLANCO, 255, cv2.THRESH_BINARY)
     return binaria
@@ -149,9 +112,8 @@ def parecido(zona: np.ndarray, plantilla: np.ndarray) -> float:
     res = np.nan_to_num(res, nan=0.0, posinf=0.0, neginf=0.0)
     return float(res.max())
 
-class Detector(threading.Thread):
-    """Captura la zona del aviso y decide cuándo se abrió un cofre."""
 
+class Detector(threading.Thread):
     def __init__(self, app: "App") -> None:
         super().__init__(daemon=True)
         self.app = app
@@ -195,7 +157,6 @@ class Detector(threading.Thread):
 
                 self.puntaje = parecido(img, plantilla)
 
-                # Histéresis: aparecer con UMBRAL, desaparecer bajo UMBRAL - HISTERESIS
                 if self.visible:
                     ahora_visible = self.puntaje >= UMBRAL - HISTERESIS
                 else:
@@ -205,14 +166,12 @@ class Detector(threading.Thread):
                 if ahora_visible and not self.visible:
                     visible_desde = ahora
 
-                # Presionaste E mientras el aviso estaba visible -> queda "armado" unos segundos
                 ultimo_press = self.app.e_ultimo_press
                 if ahora_visible and (ultimo_press > press_visto or self.app.e_presionada):
                     press_visto = ultimo_press
                     armado_hasta = ahora + TIEMPO_ARMADO
 
                 if self.visible and not ahora_visible:
-                    # El aviso se fue: ¿fue porque abriste el cofre?
                     if REQUERIR_TECLA:
                         abrio = ahora <= armado_hasta
                     else:
@@ -227,13 +186,10 @@ class Detector(threading.Thread):
                 time.sleep(max(0.0, periodo - (time.time() - t0)))
 
 
-# ---------------------- Calibración ----------------------
 class Calibrador:
-    """Muestra una captura a pantalla completa para recortar el aviso del cofre."""
-
     def __init__(self, app: "App", captura: np.ndarray, monitor: dict) -> None:
         self.app = app
-        self.captura = captura          # BGRA
+        self.captura = captura
         self.monitor = monitor
         self.inicio = None
         self.rect = None
@@ -278,12 +234,11 @@ class Calibrador:
         x0, x1 = sorted((x1, e.x))
         y0, y1 = sorted((y1, e.y))
         if x1 - x0 < 15 or y1 - y0 < 8:
-            return  # recorte demasiado pequeño, intenta de nuevo
+            return
 
         plantilla = preprocesar(self.captura)[y0:y1, x0:x1].copy()
         if cv2.countNonZero(plantilla) < 20:
-            return  # el recorte no tiene letras blancas; vuelve a intentarlo sobre "E  ABRIR"
-
+            return
 
         cv2.imwrite(str(ARCHIVO_PLANTILLA), plantilla)
         self.app.detector.set_calibracion(plantilla)
@@ -295,7 +250,6 @@ class Calibrador:
         self.app.fin_calibracion(ok)
 
 
-# ---------------------- Interfaz principal ----------------------
 class App:
     def __init__(self) -> None:
         self.partida = 0
@@ -341,7 +295,6 @@ class App:
         self.actualizar()
         self.root.after(30, self._bucle)
 
-    # ---- teclado (hilo de pynput: solo encola / marca tiempos) ----
     @staticmethod
     def _es_interactuar(key) -> bool:
         ch = getattr(key, "char", None)
@@ -349,7 +302,7 @@ class App:
 
     def _on_press(self, key) -> None:
         if self._es_interactuar(key):
-            if not self.e_presionada:          # ignora la auto-repetición al mantenerla
+            if not self.e_presionada:
                 self.e_ultimo_press = time.time()
             self.e_presionada = True
             return
@@ -365,7 +318,6 @@ class App:
         if self._es_interactuar(key):
             self.e_presionada = False
 
-    # ---- hilo de la interfaz ----
     def _bucle(self) -> None:
         cambio = False
         while not self.eventos.empty():
@@ -399,7 +351,7 @@ class App:
     def iniciar_calibracion(self) -> None:
         self.calibrando = True
         self.detector.activo.clear()
-        self.root.withdraw()  # que el contador no salga en la captura
+        self.root.withdraw()
         self.root.after(150, self._capturar_para_calibrar)
 
     def _capturar_para_calibrar(self) -> None:
@@ -448,7 +400,7 @@ class App:
         self.root.mainloop()
 
 
-PUERTO_CONTADOR = 47814      # evita que se abran dos contadores a la vez
+PUERTO_CONTADOR = 47814
 
 
 def main() -> None:
@@ -457,7 +409,7 @@ def main() -> None:
     try:
         candado.bind(("127.0.0.1", PUERTO_CONTADOR))
     except OSError:
-        return  # ya hay un contador abierto
+        return
     try:
         App().run()
     except Exception:

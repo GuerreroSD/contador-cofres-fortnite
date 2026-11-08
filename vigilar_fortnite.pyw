@@ -1,21 +1,3 @@
-"""
-Vigila si Fortnite está abierto y lanza el contador de cofres automáticamente.
-
-Uso con Python (en la misma carpeta que contador_cofres.py):
-  python vigilar_fortnite.pyw --probar        -> diagnóstico: muestra qué falla
-  python vigilar_fortnite.pyw --instalar      -> se inicia solo con Windows (y arranca ahora)
-  python vigilar_fortnite.pyw --desinstalar   -> deja de iniciarse con Windows
-
-Uso con el ejecutable:
-  ContadorCofres.exe --probar / --instalar / --desinstalar / --vigilar
-
-Funciona sin ventana. Revisa cada pocos segundos si Fortnite está corriendo:
-  - Fortnite se abre  -> abre el contador
-  - Fortnite se cierra -> cierra el contador
-Lo que pasa queda anotado en 'vigilante.log' y los errores del contador en
-'contador_error.log' (misma carpeta).
-"""
-
 import csv
 import io
 import os
@@ -26,11 +8,11 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-PREFIJO_FORTNITE = "fortniteclient-win64-shipping"   # cubre también las variantes _EAC / _EAC_EOS
-INTERVALO = 5  # segundos entre revisiones
-PUERTO_BLOQUEO = 47813  # evita que corran dos vigilantes a la vez
+PREFIJO_FORTNITE = "fortniteclient-win64-shipping"
+INTERVALO = 5
+PUERTO_BLOQUEO = 47813
 
-CONGELADO = getattr(sys, "frozen", False)   # True si corre como .exe (PyInstaller)
+CONGELADO = getattr(sys, "frozen", False)
 if CONGELADO:
     EXE = Path(sys.executable).resolve()
     CARPETA = EXE.parent
@@ -59,7 +41,6 @@ def anotar(msg: str) -> None:
 
 
 def informar(texto: str, titulo: str = "Contador de cofres") -> None:
-    """Imprime en consola, o muestra una ventana si es el .exe (no tiene consola)."""
     if CONGELADO or sys.stdout is None:
         import ctypes
         ctypes.windll.user32.MessageBoxW(None, texto, titulo, 0x40)
@@ -109,7 +90,6 @@ def lanzar_contador() -> subprocess.Popen:
 
 
 def cerrar_contador(proc: subprocess.Popen) -> None:
-    # El .exe de un solo archivo crea un proceso hijo; se cierra el árbol completo
     try:
         subprocess.run(["taskkill", "/PID", str(proc.pid), "/T", "/F"],
                        capture_output=True, creationflags=SIN_VENTANA)
@@ -129,14 +109,12 @@ def vigilante_corriendo() -> bool:
 
 
 def lanzar_vigilante() -> None:
-    """Lanza el vigilante como proceso independiente (sobrevive al cerrar la terminal)."""
     args = comando_vigilante()
     try:
         subprocess.Popen(args, cwd=CARPETA, creationflags=INDEPENDIENTE | SALIR_DEL_JOB,
                          stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
                          stderr=subprocess.DEVNULL, close_fds=True)
     except OSError:
-        # Algunos entornos no permiten salir del "job"; se intenta sin esa opción
         subprocess.Popen(args, cwd=CARPETA, creationflags=INDEPENDIENTE,
                          stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
                          stderr=subprocess.DEVNULL, close_fds=True)
@@ -175,7 +153,7 @@ def _vigilar() -> None:
                 anotar(f"El contador se cerró con error (código {contador.returncode}); "
                        f"revisa {LOG_CONTADOR.name}")
                 contador = None
-                if reintentos < 3:      # se cayó solo (no lo cerraste con F10): se reabre
+                if reintentos < 3:
                     reintentos += 1
                     anotar(f"Reabriendo contador (intento {reintentos}/3)")
                     contador = lanzar_contador()
@@ -231,7 +209,6 @@ NOMBRE_RUN = "ContadorCofresFortnite"
 
 
 def contenido_inicio() -> str:
-    """Comando que Windows ejecuta al iniciar sesión."""
     return " ".join(f'"{a}"' if not a.startswith("--") else a for a in comando_vigilante())
 
 
@@ -259,12 +236,10 @@ def tarea_existe() -> bool:
                            creationflags=SIN_VENTANA)
     except OSError:
         return False
-    # Además de existir, debe apuntar a este mismo programa
     return r.returncode == 0 and _xml(comando_vigilante()[0]) in r.stdout
 
 
 def crear_tarea() -> bool:
-    """Tarea programada 'al iniciar sesión': arranca sin el retraso de la clave Run."""
     usuario = f"{os.environ.get('USERDOMAIN', '')}\\{os.environ.get('USERNAME', '')}"
     exe, *args = comando_vigilante()
     xml = f"""<?xml version="1.0" encoding="UTF-16"?>
@@ -329,18 +304,14 @@ def borrar_tarea() -> bool:
 
 
 def esta_instalado() -> bool:
-    """True si el inicio de Windows ya apunta a este mismo programa."""
     return leer_inicio() == contenido_inicio() and tarea_existe()
 
 
 def escribir_inicio() -> None:
     import winreg
-    # Respaldo: la clave Run (Windows la ejecuta con retraso, pero siempre la ejecuta)
     with winreg.CreateKey(winreg.HKEY_CURRENT_USER, CLAVE_RUN) as k:
         winreg.SetValueEx(k, NOMBRE_RUN, 0, winreg.REG_SZ, contenido_inicio())
-    # Principal: tarea programada al iniciar sesión (sin retraso)
     crear_tarea()
-    # El método antiguo (.bat en la carpeta Inicio) no siempre se ejecuta; se elimina
     try:
         ARCHIVO_INICIO.unlink()
     except OSError:
@@ -365,7 +336,6 @@ def borrar_inicio() -> bool:
 
 
 def cerrar_vigilantes_antiguos() -> None:
-    """Cierra el vigilante viejo de Python (vigilar_fortnite.pyw) para que lo reemplace el .exe."""
     if not CONGELADO:
         return
     ps = ("Get-CimInstance Win32_Process -Filter \"Name like 'python%'\" | "
@@ -376,14 +346,13 @@ def cerrar_vigilantes_antiguos() -> None:
                        capture_output=True, creationflags=SIN_VENTANA, timeout=20)
     except (OSError, subprocess.TimeoutExpired):
         pass
-    for _ in range(10):        # espera a que se libere el candado del vigilante viejo
+    for _ in range(10):
         if not vigilante_corriendo():
             break
         time.sleep(0.3)
 
 
 def asegurar_vigilante() -> bool:
-    """Deja instalado y corriendo el vigilante. Devuelve True si fue la primera vez."""
     primera_vez = not esta_instalado()
     if primera_vez:
         escribir_inicio()
