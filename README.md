@@ -15,7 +15,7 @@ Contador automático de cofres abiertos en Fortnite que funciona **mirando la pa
 
 ### Opción A: Ejecutable (no necesita Python)
 
-1. Compila el programa (ver [Compilar](#compilar)) o descarga la carpeta `ContadorCofres` desde *Releases*, si está disponible.
+1. Descarga **[ContadorCofres-v1.0.0-windows.zip](https://github.com/GuerreroSD/contador-cofres-fortnite/releases/latest)** y descomprímelo donde quieras (o compílalo tú, ver [Compilar](#compilar)).
 2. Haz doble clic en `ContadorCofres.exe` **una sola vez**.
 3. Aparece el mensaje *"¡Listo!"*. Desde ahí el contador se abre solo cada vez que abras Fortnite, también después de reiniciar el PC.
 
