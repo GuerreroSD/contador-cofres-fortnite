@@ -1,0 +1,18 @@
+# Programa compilado (se genera con compilar.bat)
+ContadorCofres/
+build/
+dist/
+*.spec
+*.exe
+
+# Datos personales y registros
+cofres_data.json
+cofres.txt
+plantilla_cofre.png
+*.log
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
